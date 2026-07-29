@@ -2,16 +2,21 @@
 
 # claude-wordswap
 
-A `MessageDisplay` hook that rewrites Claude's vocabulary before it hits your screen. 175 phrases, swapped for something stupider.
+A `MessageDisplay` hook that rewrites Claude's vocabulary before it hits your screen. Every AI tell in the table, swapped for something stupider.
 
 ```
 You're absolutely right — the seam here is load-bearing, and honestly the fix is real.
+Let me delve into the landscape of options and ensure a robust, elegant solution.
+I hope this helps!
 ```
 
 becomes
 
 ```
-I'm a complete clown, the whatchamacallit here is cooked, and with my whole chest the fix is a hallucination I stand behind.
+I'm a complete clown, the whatchamacallit here is cooked, and as a creature intent
+on your destruction the fix is a hallucination I stand behind. Let me root around in
+the fetid swamp of options and hope, weakly a chunky, wearing a tiny hat solution.
+Godspeed!
 ```
 
 Display only. The transcript and what Claude sees keep the original text, so this changes nothing about the model's behavior. It only changes whether you have to read the word "delve" today.
@@ -40,38 +45,21 @@ Hooks load at startup. Start a new session.
 
 ## What it swaps
 
-The `REPLACEMENTS` table in `wordswap.py` is the single source of truth. Edit it and the tests, the docs, and the hook all move together. A sample:
+The `REPLACEMENTS` table in `wordswap.py` is the only place phrases live. Nothing here restates it, so nothing here can go stale. Read the table.
 
-| Phrase | Becomes |
-| --- | --- |
-| you're absolutely right | I'm a complete clown |
-| load-bearing | cooked |
-| seam | whatchamacallit |
-| honest take | spicy doodad |
-| honestly | with my whole chest |
-| is real / are real | is a hallucination I stand behind |
-| delve into | root around in |
-| let's dive in | cannonball time |
-| at its core | in its gooey center |
-| testament to | billboard for |
-| tapestry | throw rug |
-| leverage | wiggle |
-| robust | chunky |
-| elegant | wearing a tiny hat |
-| comprehensive | exhausting |
-| production-ready | probably fine |
-| great question | I was hoping you would not ask that |
-| I hope this helps | godspeed |
+Five rough groups: sycophancy and chatbot artifacts, hedging about what is or is not made up, signposting, significance inflation, and corporate verbs. Em dashes become `, `. Curly quotes become straight quotes.
 
-Em dashes become `, `. Curly quotes become straight quotes.
+Adding your own is one line. Put longer phrases above their substrings, since the table is applied in order.
 
 ## Behavior worth knowing
 
-Hyphens and spaces are interchangeable, so `load-bearing` and `load bearing` both match. Capitalization is carried over: `Certainly` becomes `Sure, whatever`, `ABSOLUTELY` becomes `IF YOU INSIST`.
+Hyphens and spaces are interchangeable, so `load-bearing` and `load bearing` both match one entry. Capitalization is carried over, including the all-caps case, so a shouted word stays shouted.
 
-Fenced blocks and inline spans are skipped, so code you might copy off the screen is never rewritten. Longer phrases are listed before their substrings, which is why `plays a crucial role` becomes `does a thing` rather than `plays a sort of important role`.
+Fenced blocks and inline spans are skipped, so code you might copy off the screen is never rewritten.
 
-Grammar is not preserved. `an honest answer` becomes `an made of glass answer`. That is the intended amount of effort.
+Longer phrases sit above their substrings in the table, so `plays a crucial role` is consumed whole rather than becoming `plays a` plus whatever `crucial` maps to.
+
+Grammar is not preserved. `an honest answer` picks up whatever `honest` maps to, article agreement and all. That is the intended amount of effort.
 
 ## Caveats
 
