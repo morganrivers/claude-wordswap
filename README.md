@@ -1,3 +1,5 @@
+**Note: Claude Opus 5 made all of this on a one-shot prompt. I find it helpful to endure less claudisms, I'm hoping this is useful to others!** 
+
 # claude-wordswap
 
 A `MessageDisplay` hook that rewrites Claude's vocabulary before it hits your screen. 175 phrases, swapped for something stupider.
