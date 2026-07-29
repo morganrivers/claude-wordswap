@@ -1,4 +1,4 @@
-**Note: Claude Opus 5 made all of this on a one-shot prompt. I find it helpful to endure less claudisms, I'm hoping this is useful to others!** 
+**Note: Claude Opus 5 made all of this on a quick back and forths. It's all vibe-coded. I find it helpful to endure less claudisms, I'm hoping this is useful to others!** 
 
 # claude-wordswap
 
