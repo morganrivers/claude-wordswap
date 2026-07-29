@@ -79,10 +79,24 @@ def test_phrases_are_unique():
     assert len(phrases) >= 50
 
 
-def test_read_text_prefers_message():
-    assert read_text({"message": "a", "delta": "b"}) == "a"
+def test_read_text_uses_delta():
     assert read_text({"delta": "b"}) == "b"
+    assert read_text({"message": "a"}) is None
     assert read_text({"session_id": "x"}) is None
+
+
+def test_fence_state_carries_across_deltas():
+    opened, inside = SWAPPER.swap_delta("prose is robust\n```python", False)
+    assert inside is True
+    assert opened == f"prose is {value_for('robust')}\n```python"
+
+    middle, inside = SWAPPER.swap_delta("robust = 1", inside)
+    assert inside is True
+    assert middle == "robust = 1"
+
+    closed, inside = SWAPPER.swap_delta("```\nrobust again", inside)
+    assert inside is False
+    assert closed == f"```\n{value_for('robust')} again"
 
 
 if __name__ == "__main__":

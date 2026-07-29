@@ -55,7 +55,9 @@ Adding your own is one line. Put longer phrases above their substrings, since th
 
 Hyphens and spaces are interchangeable, so `load-bearing` and `load bearing` both match one entry. Capitalization is carried over, including the all-caps case, so a shouted word stays shouted.
 
-Fenced blocks and inline spans are skipped, so code you might copy off the screen is never rewritten.
+Fenced blocks and inline spans are skipped, so code you might copy off the screen is never rewritten. The hook fires repeatedly while a message streams, once per batch of completed lines, so a fence can open in one batch and close in another. Fence state is kept in a small file under `$XDG_RUNTIME_DIR` (or the temp dir) keyed by `message_id`, deleted on the final batch, and swept after an hour if a message never finishes.
+
+Because batches arrive as whole lines, a phrase that straddles a line break will not match. Nothing spans lines by design.
 
 Longer phrases sit above their substrings in the table, so `plays a crucial role` is consumed whole rather than becoming `plays a` plus whatever `crucial` maps to.
 
@@ -63,9 +65,19 @@ Grammar is not preserved. `an honest answer` picks up whatever `honest` maps to,
 
 ## Caveats
 
-`MessageDisplay` is recent. Claude Code 2.1.126 has no reference to it anywhere in the binary, so on that version the hook will not fire at all. Upgrade if nothing happens.
+`MessageDisplay` is recent. Claude Code 2.1.126 has no reference to it anywhere in its binary, so on that version the hook never fires. 2.1.220 has it. Upgrade with `claude update` if nothing happens, then start a new session, since hooks load at startup.
 
-The input field carrying the message text is not pinned down in the published schema, and three sources name three different keys. `read_text` therefore accepts the first non-empty string among `message`, `message_text`, `delta`, `displayContent`, `content`, `text`. If none match, the hook emits nothing and the original text passes through untouched. If you confirm the correct key on a current version, open an issue and the list can collapse to one entry.
+The event schema, read out of the 2.1.220 binary:
+
+| Field | Meaning |
+| --- | --- |
+| `delta` | The newly completed lines since the prior flush. Always whole lines. |
+| `message_id` | UUID of the message being displayed. Stable across every flush of the same message. |
+| `index` | Zero-based index of this delta within the message. |
+| `final` | True on the message's last flush. Exactly one flush per message has it. |
+| `turn_id` | UUID of the current turn. |
+
+Output is `hookSpecificOutput.displayContent`, which replaces the delta on screen. Omit it to display the original. If `delta` is missing the hook emits nothing and the original text passes through untouched.
 
 ## Tests
 

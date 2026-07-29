@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
 import json
+import os
+import pathlib
 import re
 import sys
+import tempfile
+import time
 
-TEXT_KEYS = ("message", "message_text", "delta", "displayContent", "content", "text")
+TEXT_KEY = "delta"
+
+STATE_DIR = pathlib.Path(os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()) / "claude-wordswap"
+
+STATE_MAX_AGE_SECONDS = 3600
+
+ID_PATTERN = re.compile(r"\A[A-Za-z0-9_-]{1,128}\Z")
 
 CURLY_QUOTES = {
     "‘": "'",
@@ -14,7 +24,9 @@ CURLY_QUOTES = {
 
 EM_DASH_PATTERN = re.compile(r"\s*—\s*")
 
-CODE_PATTERN = re.compile(r"(```.*?```|~~~.*?~~~|`[^`\n]*`)", re.DOTALL)
+CODE_PATTERN = re.compile(r"(`[^`]*`)")
+
+FENCE_PATTERN = re.compile(r"\A\s*(```|~~~)")
 
 REPLACEMENTS = [
     ("you're absolutely right", "I'm a complete clown"),
@@ -196,6 +208,7 @@ REPLACEMENTS = [
     ("reach out", "pester"),
     ("circle back", "pester you again"),
     ("touch base", "pester you briefly"),
+    ("real", "hoity-toity"),
 ]
 
 
@@ -228,25 +241,71 @@ class Swapper:
             text = pattern.sub(lambda match, value=value: self._match_case(match.group(0), value), text)
         return text
 
-    def swap(self, text):
-        assert isinstance(text, str), "text must be a string"
-        segments = CODE_PATTERN.split(text)
+    def _swap_line(self, line):
+        assert "\n" not in line, "line must not span a newline"
+        segments = CODE_PATTERN.split(line)
         return "".join(
             segment if index % 2 else self._swap_prose(segment)
             for index, segment in enumerate(segments)
         )
 
+    def swap_delta(self, delta, inside_fence):
+        assert isinstance(delta, str), "delta must be a string"
+        assert isinstance(inside_fence, bool), "fence state must be a bool"
+        swapped = []
+        for line in delta.split("\n"):
+            if FENCE_PATTERN.match(line):
+                inside_fence = not inside_fence
+                swapped.append(line)
+                continue
+            swapped.append(line if inside_fence else self._swap_line(line))
+        return "\n".join(swapped), inside_fence
+
+    def swap(self, text):
+        return self.swap_delta(text, False)[0]
+
 
 SWAPPER = Swapper(REPLACEMENTS)
 
 
+class FenceState:
+    def __init__(self, message_id):
+        self.path = self._path_for(message_id)
+
+    @staticmethod
+    def _path_for(message_id):
+        if not isinstance(message_id, str) or not ID_PATTERN.match(message_id):
+            return None
+        return STATE_DIR / f"{message_id}.fence"
+
+    def read(self):
+        if self.path is None or not self.path.exists():
+            return False
+        return self.path.read_text() == "1"
+
+    def write(self, inside_fence, final):
+        assert isinstance(inside_fence, bool), "fence state must be a bool"
+        if self.path is None:
+            return
+        if final:
+            self.path.unlink(missing_ok=True)
+            return
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        self.path.write_text("1" if inside_fence else "0")
+        self._sweep()
+
+    @staticmethod
+    def _sweep():
+        cutoff = time.time() - STATE_MAX_AGE_SECONDS
+        for stale in STATE_DIR.glob("*.fence"):
+            if stale.stat().st_mtime < cutoff:
+                stale.unlink(missing_ok=True)
+
+
 def read_text(payload):
     assert isinstance(payload, dict), "hook payload must be a JSON object"
-    for key in TEXT_KEYS:
-        value = payload.get(key)
-        if isinstance(value, str) and value:
-            return value
-    return None
+    value = payload.get(TEXT_KEY)
+    return value if isinstance(value, str) and value else None
 
 
 def main():
@@ -254,10 +313,13 @@ def main():
     text = read_text(payload)
     if text is None:
         return
+    state = FenceState(payload.get("message_id"))
+    displayed, inside_fence = SWAPPER.swap_delta(text, state.read())
+    state.write(inside_fence, bool(payload.get("final")))
     output = {
         "hookSpecificOutput": {
             "hookEventName": "MessageDisplay",
-            "displayContent": SWAPPER.swap(text),
+            "displayContent": displayed,
         }
     }
     json.dump(output, sys.stdout)
